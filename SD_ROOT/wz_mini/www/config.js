@@ -1,5 +1,4 @@
 
-var feed_interval_frequency = 1000;
 var mac_re = /^[0-9a-f]{1,2}([\.:-])(?:[0-9a-f]{1,2}\1){4}[0-9a-f]{1,2}$/mi;
 
 // https://stackoverflow.com/questions/14636536/how-to-check-if-a-variable-is-an-integer-in-javascript#14794066
@@ -18,16 +17,59 @@ window.scrollTo({
 }
 
 
-window.onload = function()
+function compose_rtsp_block(stype,streams)
 {
-	var feed = document.getElementById("current_feed");
-	function update_image()
-	{
-		feed.src = feed.src.split("&")[0] + "&load=" + new Date().getTime();
-	}
-	feed_interval = setInterval(update_image, feed_interval_frequency);
-	
+  const formElement = document.querySelector("form");
+  var fdata = new FormData(formElement);
 
+  var stype = (typeof stype !== "undefined") ? stype: "RTSP_HI_RES";
+
+
+  if (fdata.get(stype + "_ENABLED") != "true") {
+        console.log(stype + " not enabled");
+    return false;
+  }
+
+  var auth = "";
+  if (fdata.get('RTSP_AUTH_DISABLE') != "true") {
+        auth = fdata.get('RTSP_LOGIN') + ':';
+        if (fdata.get('RTSP_PASSWORD') != '') {
+                auth += fdata.get('RTSP_PASSWORD');
+        } else {
+                auth += document.body.getAttribute('mac');
+        }
+        auth += "@";
+  }
+  
+         
+  stream = "unicast";
+ 
+  if ((fdata.get('RTSP_HI_RES_ENABLED') == "true") && (fdata.get('RTSP_LOW_RES_ENABLED') == "true")) {
+        if (stype == "RTSP_HI_RES") {  stream = streams['high'];   } else { stream = streams['low']; }
+ }
+
+  var link = "rtsp://" + auth + document.body.getAttribute("ip") + ":" + fdata.get('RTSP_PORT') + '/' stream;
+        
+  var vb = document.querySelectorAll('[block_name="VIDEOSTREAM"]')[0];
+  var url_block = document.createElement('DIV');
+  url_block.innerHTML = 'Stream ' + stype + ' URL: ' + '<a href="' + link +  '">' + link +  '</a>' ;
+  vb.appendChild(url_block);
+}
+
+function enable_submit()
+{
+	alert("no guarantees at all on this one. Change values at your own risk");
+       document.getElementById("update").disabled = false;
+
+}
+
+window.addEventListener("load", function()
+{
+          var streams = {'low': 'video2_unicast', 'high':'video1_unicast'};
+          if (document.body.getAttribute('camtype') != 'T31')  { streams = {'low': 'video7_unicast', 'high':'video6_unicast'};  }
+  
+        compose_rtsp_block('RTSP_HI_RES',streams);
+        compose_rtsp_block('RTSP_LOW_RES',streams);
 	document.querySelector('[name="update_config"]').addEventListener('submit',
 	function(e){
           const mac_addrs = document.getElementsByClassName('mac_addr');
@@ -56,4 +98,4 @@ window.onload = function()
 
 	}
 	);
-}
+});

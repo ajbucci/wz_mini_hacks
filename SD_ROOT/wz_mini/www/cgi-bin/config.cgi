@@ -2,8 +2,10 @@
 # This serves a rudimentary webpage based on wz_mini.conf
 . /opt/wz_mini/www/cgi-bin/shared.cgi
 
+test_area_access config
 title="$camver on $camfirmware running wz_mini $hackver as $HOSTNAME"
 updated=false
+
 
 
 
@@ -13,24 +15,24 @@ echo -e "Content-type: text/html\n\n"
 echo ""
 
 
-reboot_camera()  {
-    echo "rebooting camera (refreshing screen in 90 seconds)"
-    echo '<script type="text/javascript">setTimeout(function(){ document.location.reload (); },90 * 1000)</script>'
-    exit
-}
+die_no_config() 
+{
+if [ -f ${hack_ini} ]
+then
+    if [ -s ${hack_ini} ]
+    then
+        echo "$hack_ini exists and not empty"
+    else
+ echo "$hack_ini exists but empty"
+ echo "if you reboot then the hack will fail "
+ exit
+    fi
+else
+ echo "$hack_ini file does  not exist"
+ echo "if you reboot then the hack will fail. Please insure you have a wz_hack.conf file.."
+ exit 
+fi
 
-shft() {
-    # SE loop did not work -- thanks ash!
-   suff=8 
-   while [ "$suff" -gt 0 ] ;
-    do
-        if [[ -f "$1.$suff" ]] ; then
-            nxt=$((suff + 1))
-            mv -f "$1.$suff" "$1.$nxt"
-        fi
-   suff=$((suff-1))
-   done 
-   mv -f "$1" "$1.1"
 }
 
 
@@ -38,29 +40,6 @@ function revert_config
 {
   mv "$hack_ini" "$hack_ini.old"
   mv "$hack_ini.$1" "$hack_ini"
-}
-
-
-function revert_menu
-{
-   echo '<h2 id="revert" >Revert Menu</a>'
-   echo '<div class="old_configs">'
-   echo 'Prior Versions : ' 
-   xuff=0
-   while [ "$xuff" -lt 9 ] ; 
-   do 
-	xuff=$((xuff + 1))  
-        if [[ -f "$1.$xuff" ]] ; then
-	    filedate=$(date -r "$1.$xuff" )	
-            class=""
-	    if [ "$1.$xuff" = "$2" ];
-	    then
-               class="current_revert"
-            fi
-	    echo '<div class="revert_DIV '$class'"><div><a href="?action=show_revert&version='"$xuff"'">'"$xuff </a></div><div> $filedate</div></div>"
-        fi
-    done
-    echo '</div>'
 }
 
 
@@ -102,6 +81,7 @@ if [[ $REQUEST_METHOD = 'POST' ]]; then
   do
       K=$(echo $PAIR | cut -f1 -d=)
       VA=$(echo $PAIR | cut -f2 -d=)
+      VA=$(urldecode $VA)
       VB=\"${VA//%3A/:}\"
       #echo "<div>$K=$VB</div>"
       eval POST_$K=\"$VB\"
@@ -188,29 +168,18 @@ function ini_to_html_tf
         printf '</div>'
 }
 
-#function to handle camera feed
-function html_cam_feed
-{
-	printf '<img id="current_feed" src="/cgi-bin/jpeg.cgi?channel=1" class="feed" />'
-}
-
-
-
-function handle_css
-{
-echo -ne "<style type=\"text/css\">"
-cat config.css
-echo -ne '</style>';
-}
 
 
 echo -ne "<html><head><title>$title</title>"
-handle_css wz_mini_web.css
+handle_css config.css
 
 echo '<script type="text/javascript" src="/config.js" ></script>'
+echo '<script type="text/javascript" src="/feed.js" ></script>'
+
 echo -ne "</head>"
 
-echo -ne '<body>'
+
+echo -ne '<body ip="'$ipaddr'" mac="'$macaddr'" camtype="'$camtype'"  >'
 echo -ne "<h1>$title</h1>";
 
 
@@ -242,9 +211,10 @@ while IFS= read -r ARGUMENT; do
 	      echo '</div>'
            fi
            CONFIG_BLOCK=$((CONFIG_BLOCK + 1))
-	   echo '<div class="ii_block" block_number="'$CONFIG_BLOCK'" >'
 	   BTITLE=${ARGUMENT//#/ }
-           echo -ne '<div class="ii_block_name">'$BTITLE'</div>'
+           BN=$(echo $BTITLE | tr -d ' ')
+           echo '<div class="ii_block" block_number="'$CONFIG_BLOCK'" block_name="'$BN'" >'
+           echo -ne '<div class="ii_block_name" >'$BTITLE'</div>'
 	else
             echo -ne '<div class="ii_info">'$ARGUMENT'</div>'
 	fi
